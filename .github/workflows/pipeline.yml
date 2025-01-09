@@ -18,7 +18,7 @@ jobs:
     - name: Set up Node.js
       uses: actions/setup-node@v3
       with:
-        node-version: '18' # Use a Node.js version compatible with Firebase
+        node-version: '18'  # Use Node.js version 18 or later
 
     # Step 3: Install Firebase CLI
     - name: Install Firebase CLI
@@ -30,6 +30,10 @@ jobs:
         FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
       run: echo "Authenticated with Firebase"
 
-    # Step 5: Deploy to Firebase Hosting
+    # Step 5: Set the Firebase project
+    - name: Set Firebase project
+      run: firebase use --add --project ${{ secrets.FIREBASE_PROJECT_ID }}
+
+    # Step 6: Deploy to Firebase Hosting
     - name: Deploy to Firebase Hosting
       run: firebase deploy --only hosting --token "$FIREBASE_TOKEN"
