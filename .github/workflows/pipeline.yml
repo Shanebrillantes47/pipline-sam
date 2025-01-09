@@ -1,4 +1,4 @@
-name: Firebase Deployment Pipeline
+name: Firebase Code Check Pipeline
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - main  # Trigger the pipeline on pushes to the main branch
 
 jobs:
-  build-and-deploy:
+  check-code:
     runs-on: ubuntu-latest
 
     steps:
@@ -20,20 +20,16 @@ jobs:
       with:
         node-version: '18'  # Use Node.js version 18 or later
 
-    # Step 3: Install Firebase CLI
-    - name: Install Firebase CLI
-      run: npm install -g firebase-tools
+    # Step 3: Install dependencies (only if needed, based on your project)
+    - name: Install dependencies
+      run: npm install
 
-    # Step 4: Authenticate with Firebase
+    # Step 4: Authenticate with Firebase (optional, for accessing Firebase database)
     - name: Authenticate with Firebase
       env:
         FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
       run: echo "Authenticated with Firebase"
 
-    # Step 5: Set the Firebase project
-    - name: Set Firebase project
-      run: firebase use --add --project ${{ secrets.FIREBASE_PROJECT_ID }}
-
-    # Step 6: Deploy to Firebase Hosting
-    - name: Deploy to Firebase Hosting
-      run: firebase deploy --only hosting --token "$FIREBASE_TOKEN"
+    # Step 5: Run your custom checks or tests
+    - name: Run Tests or Code Linting
+      run: npm test  # You can replace this with your specific code quality checks, e.g., linting
