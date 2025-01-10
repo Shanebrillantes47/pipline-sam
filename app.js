@@ -100,27 +100,31 @@ function sendOTP(email) {
 
   console.log(`OTP for ${email}: ${otp}`);
 
-  // Send OTP to server using fetch
-  fetch('http://localhost:3000/send-otp', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
+  // Email sending configuration
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: 'your-email@gmail.com', // Your email address
+      pass: 'your-app-password',     // Your generated app password
     },
-    body: JSON.stringify({ email: email, otp: otp }),
-  })
-    .then(response => response.json())
-    .then(data => {
-      if (data.success) {
-        console.log('OTP sent successfully');
-      } else {
-        console.error('Failed to send OTP:', data.error);
-      }
-    })
-    .catch(error => {
-      console.error('Error sending OTP:', error);
-    });
-}
+  });
 
+  const mailOptions = {
+    from: 'your-email@gmail.com', // Sender address
+    to: email,                    // Recipient address
+    subject: 'Your OTP',          // Email subject
+    text: `Your OTP is: ${otp}`,  // Email body content
+  };
+
+  // Send the email
+  transporter.sendMail(mailOptions, (error, info) => {
+    if (error) {
+      console.error('Error sending OTP:', error);
+    } else {
+      console.log('OTP sent successfully:', info.response);
+    }
+  });
+}
 
 
 
