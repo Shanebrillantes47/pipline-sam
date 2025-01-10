@@ -22,6 +22,7 @@ const nodemailer = ('nodemailer');
 
 let currentUserEmail = '';
 let currentUserRole = '';
+let userDatarole = '';
 
 // Handle registration form submission
 document.getElementById('registerForm')?.addEventListener('submit', function (e) {
@@ -69,7 +70,11 @@ document.getElementById('loginForm')?.addEventListener('submit', function (e) {
   loginUser(email, password);
 });
 
+let otpSent = false;  // Add this flag to track OTP sending
+
 export function loginUser(email, password) {
+  if (otpSent) return;  // Prevent OTP from being sent multiple times
+
   auth.signInWithEmailAndPassword(email, password)
     .then((userCredential) => {
       const user = userCredential.user;
@@ -80,13 +85,22 @@ export function loginUser(email, password) {
       currentUserEmail = userData.email;
       currentUserRole = userData.role;
       console.log('User data:', userData);
-      sendOTP(currentUserEmail);
+
+      // Store role in localStorage
+      localStorage.setItem('currentUserRole', currentUserRole);
+
+      sendOTP(currentUserEmail);  // Send OTP after user data is retrieved
+      otpSent = true;  // Mark OTP as sent
+
+      // Redirect to otp.html to allow OTP input
       window.location.href = 'otp.html';
     })
     .catch((error) => {
       alert('Login failed: ' + error.message);
     });
 }
+
+
 const serverEndpoint = 'http://localhost:3000/send-otp';
 
 function sendOTP(email) {
@@ -100,31 +114,27 @@ function sendOTP(email) {
 
   console.log(`OTP for ${email}: ${otp}`);
 
-  // Email sending configuration
-  const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: 'your-email@gmail.com', // Your email address
-      pass: 'your-app-password',     // Your generated app password
+  // Send OTP to server using fetch
+  fetch('http://localhost:3000/send-otp', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
     },
-  });
-
-  const mailOptions = {
-    from: 'your-email@gmail.com', // Sender address
-    to: email,                    // Recipient address
-    subject: 'Your OTP',          // Email subject
-    text: `Your OTP is: ${otp}`,  // Email body content
-  };
-
-  // Send the email
-  transporter.sendMail(mailOptions, (error, info) => {
-    if (error) {
+    body: JSON.stringify({ email: email, otp: otp }),
+  })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        console.log('OTP sent successfully');
+      } else {
+        console.error('Failed to send OTP:', data.error);
+      }
+    })
+    .catch(error => {
       console.error('Error sending OTP:', error);
-    } else {
-      console.log('OTP sent successfully:', info.response);
-    }
-  });
+    });
 }
+
 
 
 
@@ -133,10 +143,15 @@ export function verifyOTP(enteredOTP) {
   const storedOTP = localStorage.getItem('currentOTP');
   const otpMessage = document.getElementById('otpMessage');
 
+  // Retrieve the role from localStorage
+  const currentUserRole = localStorage.getItem('currentUserRole');
+
   // Check if entered OTP matches the stored OTP or the bypass code
   if (enteredOTP === storedOTP || enteredOTP === 'bypass') {
     console.log('OTP verified or bypass code used'); // Debugging log
     localStorage.removeItem('currentOTP'); // Clean up stored OTP
+
+    // Use the role from localStorage to determine the redirect
     if (currentUserRole === 'admin') {
       window.location.href = 'admin.html';
     } else {
@@ -147,6 +162,7 @@ export function verifyOTP(enteredOTP) {
     otpMessage.style.color = 'red';
   }
 }
+
 
 
 function checkAuth() {
