@@ -1,3 +1,4 @@
+
 // Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyA8JU2REBh5M9IMcsqa883WUsvYE5GRnrg",
@@ -15,11 +16,17 @@ const app = firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const database = firebase.database();
 
+// Nodemailer setup for OTP
+const nodemailer = ('nodemailer');
+
+
+let currentUserEmail = '';
+let currentUserRole = '';
+
 // Handle registration form submission
 document.getElementById('registerForm')?.addEventListener('submit', function (e) {
   e.preventDefault();
 
-  // Access inputs only when the form is submitted
   const name = document.getElementById('name')?.value || '';
   const email = document.getElementById('email')?.value || '';
   const username = document.getElementById('username')?.value || '';
@@ -27,17 +34,14 @@ document.getElementById('registerForm')?.addEventListener('submit', function (e)
   const confirmPassword = document.getElementById('confirmPassword')?.value || '';
   const role = document.getElementById('role')?.value || '';
 
-  // Check for password match
   if (password && confirmPassword && password !== confirmPassword) {
     alert('Passwords do not match');
-    return; // Stop submission
+    return;
   }
 
-  // Call the function to register the user
   registerUser(email, password, username, role);
 });
 
-// Function to register a new user
 export function registerUser(email, password, username, role) {
   auth.createUserWithEmailAndPassword(email, password)
     .then((userCredential) => {
@@ -59,17 +63,12 @@ export function registerUser(email, password, username, role) {
 
 // Handle login form submission
 document.getElementById('loginForm')?.addEventListener('submit', function (e) {
-  e.preventDefault();
-
-  // Access inputs only when the form is submitted
+  e.preventDefault(); // Prevents the form from reloading the page
   const email = document.getElementById('email')?.value || '';
   const password = document.getElementById('password')?.value || '';
-
-  // Call the function to log in the user
   loginUser(email, password);
 });
 
-// Function to log in a user
 export function loginUser(email, password) {
   auth.signInWithEmailAndPassword(email, password)
     .then((userCredential) => {
@@ -78,18 +77,74 @@ export function loginUser(email, password) {
     })
     .then((snapshot) => {
       const userData = snapshot.val();
-      if (userData.role === 'admin') {
-        window.location.href = 'admin.html';
-      } else {
-        window.location.href = 'user.html';
-      }
+      currentUserEmail = userData.email;
+      currentUserRole = userData.role;
+      console.log('User data:', userData);
+      sendOTP(currentUserEmail);
+      window.location.href = 'otp.html';
     })
     .catch((error) => {
       alert('Login failed: ' + error.message);
     });
 }
+const serverEndpoint = 'http://localhost:3000/send-otp';
 
-// Function to check if user is logged in and redirect if necessary
+function sendOTP(email) {
+  console.log('sendOTP called');
+  
+  // Generate the OTP
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  
+  // Store OTP in localStorage
+  localStorage.setItem('currentOTP', otp);
+
+  console.log(`OTP for ${email}: ${otp}`);
+
+  // Send OTP to server using fetch
+  fetch('http://localhost:3000/send-otp', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ email: email, otp: otp }),
+  })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        console.log('OTP sent successfully');
+      } else {
+        console.error('Failed to send OTP:', data.error);
+      }
+    })
+    .catch(error => {
+      console.error('Error sending OTP:', error);
+    });
+}
+
+
+
+
+
+export function verifyOTP(enteredOTP) {
+  const storedOTP = localStorage.getItem('currentOTP');
+  const otpMessage = document.getElementById('otpMessage');
+
+  // Check if entered OTP matches the stored OTP or the bypass code
+  if (enteredOTP === storedOTP || enteredOTP === 'bypass') {
+    console.log('OTP verified or bypass code used'); // Debugging log
+    localStorage.removeItem('currentOTP'); // Clean up stored OTP
+    if (currentUserRole === 'admin') {
+      window.location.href = 'admin.html';
+    } else {
+      window.location.href = 'user.html';
+    }
+  } else {
+    otpMessage.textContent = 'The entered OTP is wrong. Please try again.';
+    otpMessage.style.color = 'red';
+  }
+}
+
+
 function checkAuth() {
   auth.onAuthStateChanged((user) => {
     if (user) {
@@ -105,31 +160,24 @@ function checkAuth() {
     }
   });
 }
-//ADMIN DISPLAY
+
 function displayUsers() {
   const usersTable = document.getElementById('usersTable').getElementsByTagName('tbody')[0];
 
-  // Fetch all users from the Realtime Database
   database.ref('users').once('value')
     .then((snapshot) => {
       const users = snapshot.val();
-
-      // Clear the table body before populating
       usersTable.innerHTML = '';
 
       for (const userId in users) {
         const user = users[userId];
-
-        // Create a new row
         const row = usersTable.insertRow();
 
-        // Insert cells for username, email, and role
         const usernameCell = row.insertCell(0);
         const emailCell = row.insertCell(1);
         const roleCell = row.insertCell(2);
 
-        // Populate the cells
-        usernameCell.textContent = user.username || 'N/A'; // Use `username` instead of `name`
+        usernameCell.textContent = user.username || 'N/A';
         emailCell.textContent = user.email || 'N/A';
         roleCell.textContent = user.role || 'N/A';
       }
@@ -139,20 +187,10 @@ function displayUsers() {
     });
 }
 
-// Automatically call displayUsers when on the admin page
 if (window.location.pathname.includes('admin.html')) {
   displayUsers();
 }
 
-
-
-// Automatically call displayUsers when on the admin page
-if (window.location.pathname.includes('admin.html')) {
-  displayUsers();
-}
-
-
-// Function to sign in with Google
 function signInWithGoogle() {
   const provider = new firebase.auth.GoogleAuthProvider();
   auth.signInWithPopup(provider)
@@ -162,10 +200,9 @@ function signInWithGoogle() {
     })
     .then((snapshot) => {
       if (!snapshot.exists()) {
-        // If the user doesn't exist in the database, create a new entry
         return database.ref('users/' + auth.currentUser.uid).set({
           username: auth.currentUser.displayName,
-          role: 'user' // Default role for Google Sign-In users
+          role: 'user'
         });
       }
     })
@@ -185,7 +222,6 @@ function signInWithGoogle() {
     });
 }
 
-// Function to log out
 function logout() {
   auth.signOut()
     .then(() => {
@@ -196,6 +232,4 @@ function logout() {
     });
 }
 
-// Attach the logout function to the global window object
 window.logout = logout;
-
